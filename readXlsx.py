@@ -3,6 +3,7 @@
 import os, glob
 import openpyxl
 import logging
+import subprocess
 
 # Logging configuration
 logging.basicConfig(level=logging.DEBUG, format=' %(asctime)s - %(levelname)s - %(message)s')
@@ -11,7 +12,7 @@ def readFromXlsx(filename):
     wb = openpyxl.load_workbook(filename, read_only=True)
     sheet = wb.get_sheet_by_name('Tabelle1')
     list_to_return = []
-    for rowOfCellObjects in sheet['A2':'C13']:
+    for rowOfCellObjects in sheet['A2':'C18']:
         tempList = []
         for cellObj in rowOfCellObjects:
             tempList.append(cellObj.value)
@@ -23,28 +24,48 @@ def readFromXlsx(filename):
 def convertMinutes(inputList):
     list_to_return = []
     for i,start,end in inputList:
-        #logging.debug("Aufgabe: {0}\nStartpunkt: {1}\nEnde: {2}".format(i,start,end))
-        convList = []
-        convList.append(i)
-        start = "{0:.2f}".format(float(start))
-        #logging.debug("Value for start is {}".format(start))
-        padded_start = "00:{:05.2f}".format(float(start))
-        #logging.debug("Value for padded_start is {}".format(padded_start))
-        padded_start = padded_start.replace('.',':')
-        convList.append(padded_start)
-        end = "{0:.2f}".format(end)
-        #logging.debug("Value for end is {}".format(end))
-        padded_end = "00:{:05.2f}".format(float(end))
-        #logging.debug("Value for padded_end is {}".format(padded_end))
-        padded_end = padded_end.replace('.',':')
-        convList.append(padded_end)
+        if start != 'x' and start != 'X' and end != 'x' and end != 'X':
+            convList = []
+            #logging.debug("Aufgabe: {0}\nStartpunkt: {1}\nEnde: {2}".format(i,start,end))
+            convList.append(str(i))
+            start = "{0:.2f}".format(float(start))
+            #logging.debug("Value for start is {}".format(start))
+            padded_start = "00:{:05.2f}".format(float(start))
+            #logging.debug("Value for padded_start is {}".format(padded_start))
+            padded_start = padded_start.replace('.',':')
+            convList.append(padded_start)
+            end = "{0:.2f}".format(end)
+            #logging.debug("Value for end is {}".format(end))
+            padded_end = "00:{:05.2f}".format(float(end))
+            #logging.debug("Value for padded_end is {}".format(padded_end))
+            padded_end = padded_end.replace('.',':')
+            convList.append(padded_end)
+        else:
+            logging.info("Kein Wert für Aufgabe {}".format(i))
         #logging.debug("Tuple of converted values: {}".format(tuple(convList)))
         list_to_return.append(tuple(convList))
     
-    return tuple(list_to_return)
+    return tuple(sorted(set(list_to_return), key=lambda x: x[0]))
 
 #TODO: Cut the video with ffmpeg
 # ffmpeg -i INPUT_FILE.MP4 -ss 00:00:03 -t 00:00:08 -async 1 OUTPUT_FILE.mp4
+
+def callFfmpeg(list_of_tuples):
+    # Input-Datei finden
+    mp4Files = [f for f in glob.glob("*.MP4")]
+    try:
+        os.path.isfile(mp4Files[0])
+        input_file = mp4Files[0]
+        output_core = mp4Files[0].strip("Erhebung_I_")
+        for t in list_of_tuples:
+            # Output-Namen konstruieren
+            output = "{}{}_{}".format('parts/',t[0],output_core)
+            # Commando konstruieren
+            cmd = "ffmpeg -i {} -ss {} -to {} -async 1 {}".format(input_file,t[1],t[2],output)
+            cmd_as_list = cmd.split()
+            subprocess.run(cmd_as_list)
+    except:
+        logging.exception("No media file in {}".format(os.getcwd()))
 
 def main():
     # Get root dir of the project
@@ -70,18 +91,12 @@ def main():
         xlsx = [f for f in glob.glob("*.xlsx") and glob.glob("Timestamp_*")]
 #        logging.debug("In dir {} is {}".format(os.getcwd(), xlsx[0]))
 
-        #: Extract the folder specific name (to be used in the output files of ffmpeg)
-        output_name = xlsx[0].strip(".xlsx")
-        output_name = output_name.strip("Timestamp_")
-        #logging.debug("Output name is: {}".format(output_name))
-
         #Get the numbers from the excel sheet
         for x in xlsx:
             logging.debug("Filename is {}".format(x))
             list_of_times = readFromXlsx(x)
-            print(list_of_times)
             converted = convertMinutes(list_of_times)
-            print(converted)
+            callFfmpeg(converted)
 
 if __name__ == "__main__":
     main()
