@@ -9,14 +9,40 @@ logging.basicConfig(level=logging.DEBUG, format=' %(asctime)s - %(levelname)s - 
 
 def readFromXlsx(filename):
     wb = openpyxl.load_workbook(filename, read_only=True)
-    sheet = wb.get_sheet_by_name('Sheet1')
+    sheet = wb.get_sheet_by_name('Tabelle1')
     for rowOfCellObjects in sheet['A2':'C13']:
         tempList = []
         for cellObj in rowOfCellObjects:
             tempList.append(cellObj.value)
         logging.debug(tuple(tempList))
+        yield tuple(tempList)
+
+#TODO: Change format of timestamps from 0,X to 00:00:X
+def convertMinutes(inputTuple):
+    for i,start,end in inputTuple:
+        logging.debug("Aufgabe: {0}\nStartpunkt: {1}\nEnde: {2}".format(i,start,end))
+        convList = []
+        convList.append(i)
+        start = "{0:.2f}".format(float(start))
+        logging.debug("Value for start is {}".format(start))
+        halt = input()
+        padded_start = "00:{:05.2f}".format(float(start))
+        logging.debug("Value for padded_start is {}".format(padded_start))
+        padded_start = padded_start.replace('.',':')
+        convList.append(padded_start)
+        end = "{0:.2f}".format(end)
+        logging.debug("Value for end is {}".format(end))
+        halt = input()
+        padded_end = "00:{:05.2f}".format(float(end))
+        logging.debug("Value for padded_end is {}".format(padded_end))
+        padded_end = padded_end.replace('.',':')
+        convList.append(padded_end)
+        logging.debug("Tuple of converted values: {}".format(tuple(convList)))
+#        yield tuple(convList)
 
 #TODO: Cut the video with ffmpeg
+# ffmpeg -i INPUT_FILE.MP4 -ss 00:00:03 -t 00:00:08 -async 1 OUTPUT_FILE.mp4
+
 
 def main():
     # Get root dir of the project
@@ -40,12 +66,16 @@ def main():
 
         #Find xlsx files
         xlsx = [f for f in glob.glob("*.xlsx") and glob.glob("Timestamp_*")]
-        logging.debug("In dir {} is {}".format(os.getcwd(), xlsx[0]))
+#        logging.debug("In dir {} is {}".format(os.getcwd(), xlsx[0]))
 
         #: Extract the folder specific name (to be used in the output files of ffmpeg)
         output_name = xlsx[0].strip(".xlsx")
         output_name = output_name.strip("Timestamp_")
         logging.debug("Output name is: {}".format(output_name))
+
+        #Get the numbers from the excel sheet
+        for x in xlsx:
+            convertMinutes(readFromXlsx(x))
 
 if __name__ == "__main__":
     main()
