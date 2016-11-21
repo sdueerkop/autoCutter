@@ -5,6 +5,8 @@ import openpyxl
 import logging
 import subprocess
 
+#TODO: Handle for empty directories and empty xlsx-files
+
 # Logging configuration
 logging.basicConfig(level=logging.DEBUG, format=' %(asctime)s - %(levelname)s - %(message)s')
 
@@ -24,7 +26,7 @@ def readFromXlsx(filename):
 def convertMinutes(inputList):
     list_to_return = []
     for i,start,end in inputList:
-        if start != 'x' and start != 'X' and end != 'x' and end != 'X':
+        if start != 'x' and start != 'X' and end != 'x' and end != 'X' and start != None and end != None:
             convList = []
             #logging.debug("Aufgabe: {0}\nStartpunkt: {1}\nEnde: {2}".format(i,start,end))
             convList.append(str(i))
@@ -59,8 +61,11 @@ def callFfmpeg(list_of_tuples):
         for t in list_of_tuples:
             # Output-Namen konstruieren
             output = "{}{}_{}".format('parts/',t[0],output_core)
+            if os.path.isfile(output):
+                logging.info("File {} exists. Skipping.".format(output))
+                continue
             # Commando konstruieren
-            cmd = "ffmpeg -filter_complex "highpass=f=400,lowpass=f=5800" -i {} -ss {} -to {} -async 1 {}".format(input_file,t[1],t[2],output)
+            cmd = 'ffmpeg -filter_complex highpass=f=400,lowpass=f=5800 -i {} -ss {} -to {} -async 1 {}'.format(input_file,t[1],t[2],output)
             cmd_as_list = cmd.split()
             subprocess.run(cmd_as_list)
     except:
@@ -79,6 +84,12 @@ def main():
     for d in list_of_dirs:
         os.chdir(os.path.join(src_dir,d))
         logging.debug("Current path is: {}".format(os.getcwd()))
+        
+        # Check if media file exists
+        if not os.path.isfile("Erhebung_I_{}.MP4".format(d)):
+            logging.debug("Filename should be: Erhebung_I_{}.MP4".format(d))
+            logging.info("No media file named in {}!".format(os.getcwd()))
+            continue
 
         # Create a 'parts' folder
         try:
@@ -88,7 +99,7 @@ def main():
 
         #Find xlsx files
         xlsx = [f for f in glob.glob("*.xlsx") and glob.glob("Timestamp_*")]
-#        logging.debug("In dir {} is {}".format(os.getcwd(), xlsx[0]))
+        logging.debug("In dir {} is {}".format(os.getcwd(), xlsx[0]))
 
         #Get the numbers from the excel sheet
         for x in xlsx:
